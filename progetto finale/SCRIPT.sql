@@ -53,6 +53,8 @@ show columns from transazioni;
 -- TODO: convertire tutte le view in temporary table (in modo da non salvarle definitivamente nel db).
 -- fai questo solo come ultimo step, quando hai finito tutto (le view sono comode per ispezione tramite dbeaver).
 
+-- TODO: rivedere le join (ad es. su id_cliente deve esserci una right join con cliente)
+
 drop view if exists cliente_tmp;
 create view cliente_tmp as 
 select *,FLOOR(DATEDIFF(CURRENT_DATE(),data_nascita)/365) as eta from cliente;
@@ -227,3 +229,98 @@ select
 select * from tot_trans_table limit 10;
 
 */
+
+-- Numero totale di conti posseduti.
+-- qui non importa la tipologia di conto
+
+drop view if exists num_tot_conti;
+create view num_tot_conti as (
+	select 
+		c.id_cliente as id_cliente,
+		COUNT(distinct c.id_conto) as num_accounts
+	from conto c
+	inner join cliente clien on c.id_cliente = clien.id_cliente 
+	group by id_cliente
+	order by id_cliente asc
+);
+
+select * from num_tot_conti limit 10;
+
+
+-- Numero di conti posseduti per tipologia (un indicatore per ogni tipo di conto).
+-- lo stesso appena fatto, ma diviso per tipo di conto
+
+drop view if exists num_tot_conti_tipologia;
+create view num_tot_conti_tipologia as (
+	select 
+		c.id_cliente as id_cliente,
+		tc.desc_tipo_conto as tipo,
+		COUNT(distinct c.id_conto) as num_accounts
+	from conto c
+	inner join cliente clien on c.id_cliente = clien.id_cliente 
+	inner join tipo_conto tc on c.id_tipo_conto = tc.id_tipo_conto 
+	group by id_cliente, tc.desc_tipo_conto
+	order by id_cliente asc
+);
+
+select * from num_tot_conti_tipologia limit 20;
+
+-- Numero di transazioni in uscita per tipologia di conto (un indicatore per tipo di conto).
+-- Numero di transazioni in entrata per tipologia di conto (un indicatore per tipo di conto).
+-- faccio questi due indicatori in unica view (come per il caso generale senza suddivisione per tipo conto)
+
+
+drop view if exists num_trans_tipologia;
+create view num_trans_tipologia as (
+	select
+	 clien.id_cliente as id_cliente,
+		CASE
+		when tipo_t.segno = '+' then 'accredito'
+		else 'spesa'
+	end as tipo_transazione,
+	tc.desc_tipo_conto as tipo_conto,
+	COUNT(*) as num_transazioni
+	from transazioni t
+	inner join tipo_transazione tipo_t on t.id_tipo_trans = tipo_t.id_tipo_transazione 
+	inner join conto c on t.id_conto = c.id_conto 
+	inner join cliente clien on c.id_cliente = clien.id_cliente 
+	inner join tipo_conto tc on c.id_tipo_conto = tc.id_tipo_conto 
+	group by clien.id_cliente, tipo_t.segno, tc.desc_tipo_conto
+	order by id_cliente asc
+);
+select * from num_trans_tipologia limit 50;
+
+
+-- Importo transato in uscita per tipologia di conto (un indicatore per tipo di conto).
+-- Importo transato in entrata per tipologia di conto (un indicatore per tipo di conto).
+-- faccio questi due indicatori in unica view (come per il caso generale senza suddivisione per tipo conto)
+
+drop view if exists tot_trans_tipologia;
+create view tot_trans_tipologia as (
+select
+	clien.id_cliente as id_cliente,
+	CASE
+		when tipo_t.segno = '+' then 'accredito'
+		else 'spesa'
+	end as tipo_transzione,
+	tc.desc_tipo_conto as tipo_conto,
+	sum(t.importo) as totale
+	from transazioni t
+	inner join tipo_transazione tipo_t on t.id_tipo_trans = tipo_t.id_tipo_transazione 
+	inner join conto c on t.id_conto = c.id_conto 
+	inner join cliente clien on c.id_cliente = clien.id_cliente 
+	inner join tipo_conto tc on c.id_tipo_conto = tc.id_tipo_conto 
+	group by clien.id_cliente, tipo_t.segno, tc.desc_tipo_conto
+	order by id_cliente asc
+);
+
+select * from tot_trans_tipologia limit 50;
+
+
+
+
+
+
+
+
+
