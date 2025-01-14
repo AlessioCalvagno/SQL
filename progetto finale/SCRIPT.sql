@@ -253,17 +253,52 @@ select * from num_tot_conti limit 10;
 drop view if exists num_tot_conti_tipologia;
 create view num_tot_conti_tipologia as (
 	select 
-		c.id_cliente as id_cliente,
+		clien.id_cliente as id_cliente,
 		tc.desc_tipo_conto as tipo,
-		COUNT(distinct c.id_conto) as num_accounts
+		COUNT(c.id_conto) as num_accounts
 	from conto c
-	inner join cliente clien on c.id_cliente = clien.id_cliente 
-	inner join tipo_conto tc on c.id_tipo_conto = tc.id_tipo_conto 
-	group by id_cliente, tc.desc_tipo_conto
-	order by id_cliente asc
+	inner join tipo_conto tc on c.id_tipo_conto = tc.id_tipo_conto -- prima inner join
+	inner join cliente clien on c.id_cliente = clien.id_cliente
+	group by clien.id_cliente, tc.desc_tipo_conto
+	order by clien.id_cliente asc
 );
 
-select * from num_tot_conti_tipologia limit 20;
+select * from num_tot_conti_tipologia limit 50;
+
+-- nella view di qui sopra NON serve fare join con tipo_conto. Posso sfruttare la colonna id_tipo_conto di conto che è lo stesso della join alla fine.
+select 
+clien.id_cliente,
+c.id_tipo_conto,
+count(c.id_conto) as num_accounts
+from conto c
+right join cliente clien on c.id_cliente = clien.id_cliente
+group by clien.id_cliente,c.id_tipo_conto
+order by clien.id_cliente asc;
+
+-- forse ci sono
+select 
+count(*)
+from conto c
+right join cliente clien on c.id_cliente = clien.id_cliente
+where clien.id_cliente = 2 and c.id_tipo_conto = 1;
+
+
+select 
+clien.id_cliente,
+count(*) as num
+from conto c
+right join cliente clien on c.id_cliente = clien.id_cliente
+where c.id_tipo_conto = 0 -- replicare pure per gli altri valori di id_conto
+group by clien.id_cliente
+order by clien.id_cliente asc;
+
+/*
+ * nella tabella finale inizializzo i contatori a 0 (quando creo la tabella metto un default value a 0, oppure faccio poi un primo update)
+ * POI
+ * faccio un update prendendo i valori dalla select di qui sopra e così il contatore si aggiorna solo dove c'è un record.
+ */
+
+
 
 -- Numero di transazioni in uscita per tipologia di conto (un indicatore per tipo di conto).
 -- Numero di transazioni in entrata per tipologia di conto (un indicatore per tipo di conto).
@@ -302,7 +337,7 @@ select
 	CASE
 		when tipo_t.segno = '+' then 'accredito'
 		else 'spesa'
-	end as tipo_transzione,
+	end as tipo_transazione,
 	tc.desc_tipo_conto as tipo_conto,
 	sum(t.importo) as totale
 	from transazioni t
@@ -317,10 +352,299 @@ select
 select * from tot_trans_tipologia limit 50;
 
 
+/**
+ * 
+ * 
+ * TABELLA FINALE
+ * 
+ * 
+ */
+
+drop table if exists tab_finale;
+create table tab_finale (
+id_cliente int not null,
+eta int,
+num_trans_out_all int default 0,
+num_trans_in_all int default 0,
+importo_out_all double default 0.0,
+importo_in_all double default 0.0,
+num_conti_tot int default 0,
+num_conti_base int default 0,
+num_conti_business int default 0,
+num_conti_privati int default 0,
+num_conti_famiglie int default 0,
+num_trans_out_base int default 0,
+num_trans_out_business int default 0,
+num_trans_out_privati int default 0,
+num_trans_out_famiglie int default 0,
+num_trans_in_base int default 0,
+num_trans_in_business int default 0,
+num_trans_in_privati int default 0,
+num_trans_in_famiglie int default 0,
+importo_out_base double default 0.0,
+importo_out_business double default 0.0,
+importo_out_privati double default 0.0,
+importo_out_famiglie double default 0.0,
+importo_in_base double default 0.0,
+importo_in_business double default 0.0,
+importo_in_privati double default 0.0,
+importo_in_famiglie double default 0.0
+);
+
+insert into tab_finale (id_cliente, eta) 
+	select
+		id_cliente,eta
+	from cliente_tmp;
 
 
 
+-- in MySql non funziona l'update ... from (funziona in sql server)...
+-- https://stackoverflow.com/questions/65877833/is-update-set-from-syntax-supported-in-mysql?noredirect=1&lq=1
+/*
+update tab_finale tf set tf.num_trans_out_all = t.value
+from 
+(	
+	select n.id_cliente, n.value
+	from num_trans n
+	where n.tipo = 'spesa'
+) as t
+where tf.id_cliente = t.id_cliente; 
+*/
+
+-- si deve far un workaround tramite join
+UPDATE tab_finale tf
+JOIN (
+    SELECT n.id_cliente, n.value
+    FROM num_trans n
+    WHERE n.tipo = 'spesa'
+) AS t ON tf.id_cliente = t.id_cliente
+SET tf.num_trans_out_all = t.value;
 
 
+UPDATE tab_finale tf
+JOIN (
+    SELECT n.id_cliente, n.value
+    FROM num_trans n
+    WHERE n.tipo = 'accredito'
+) AS t ON tf.id_cliente = t.id_cliente
+SET tf.num_trans_in_all = t.value;
+
+-- totale transazioni (importo)
+
+UPDATE tab_finale tf
+JOIN (
+    SELECT tot.id_cliente, tot.totale
+    FROM tot_trans tot
+    WHERE tot.tipo = 'spesa'
+) AS t ON tf.id_cliente = t.id_cliente
+SET tf.importo_out_all = round(t.totale,2);
+
+UPDATE tab_finale tf
+JOIN (
+    SELECT tot.id_cliente, tot.totale
+    FROM tot_trans tot
+    WHERE tot.tipo = 'accredito'
+) AS t ON tf.id_cliente = t.id_cliente
+SET tf.importo_in_all = round(t.totale,2);
 
 
+-- numero conti
+update tab_finale tf
+join (
+	select id_cliente, num_accounts
+	from num_tot_conti
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_conti_tot = t.num_accounts;
+
+-- numero conti per tipologia  num_tot_conti_tipologia
+
+-- base
+update tab_finale tf 
+join (
+	select n.id_cliente, n.num_accounts
+	from num_tot_conti_tipologia n
+	where n.tipo like '%Base%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_conti_base = t.num_accounts;
+
+-- business
+update tab_finale tf 
+join (
+	select n.id_cliente, n.num_accounts
+	from num_tot_conti_tipologia n
+	where n.tipo like '%Business%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_conti_business = t.num_accounts;
+
+-- privati
+update tab_finale tf 
+join (
+	select n.id_cliente, n.num_accounts
+	from num_tot_conti_tipologia n
+	where n.tipo like '%Privati%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_conti_privati = t.num_accounts;
+
+-- famiglie
+update tab_finale tf 
+join (
+	select n.id_cliente, n.num_accounts
+	from num_tot_conti_tipologia n
+	where n.tipo like '%Famiglie%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_conti_famiglie = t.num_accounts;
+
+-- Numero di transazioni in uscita per tipologia di conto num_trans_tipologia
+
+-- base
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'spesa' and n.tipo_conto like '%Base%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_out_base = t.num_transazioni;
+
+-- business
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'spesa' and n.tipo_conto like '%Business%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_out_business = t.num_transazioni;
+
+-- privati
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'spesa' and n.tipo_conto like '%Privati%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_out_privati = t.num_transazioni;
+
+
+-- famiglie
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'spesa' and n.tipo_conto like '%Famiglie%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_out_famiglie = t.num_transazioni;
+
+-- Numero di transazioni in entrata per tipologia di conto [num_trans_tipologia]
+
+-- base
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'accredito' and n.tipo_conto like '%Base%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_in_base = t.num_transazioni;
+
+-- business
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'accredito' and n.tipo_conto like '%Business%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_in_business = t.num_transazioni;
+
+-- privati
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'accredito' and n.tipo_conto like '%Privati%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_in_privati = t.num_transazioni;
+
+
+-- famiglie
+update tab_finale tf
+join (
+	select n.id_cliente, n.num_transazioni
+	from num_trans_tipologia n
+	where n.tipo_transazione = 'accredito' and n.tipo_conto like '%Famiglie%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.num_trans_in_famiglie = t.num_transazioni;
+
+-- Importo transato in uscita per tipologia di conto [tot_trans_tipologia]
+
+-- base
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'spesa' and tot.tipo_conto like '%Base%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_out_base  = round(t.totale,2);
+
+-- business
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'spesa' and tot.tipo_conto like '%Business%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_out_business = round(t.totale,2);
+
+-- privati
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'spesa' and tot.tipo_conto like '%Privati%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_out_privati  = round(t.totale,2);
+
+-- famiglie
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'spesa' and tot.tipo_conto like '%Famiglie%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_out_famiglie = round(t.totale,2);
+
+
+-- Importo transato in entrata per tipologia di conto 
+
+-- base
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'accredito' and tot.tipo_conto like '%Base%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_in_base  = round(t.totale,2);
+
+-- business
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'accredito' and tot.tipo_conto like '%Business%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_in_business = round(t.totale,2);
+
+-- privati
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'accredito' and tot.tipo_conto like '%Privati%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_in_privati  = round(t.totale,2);
+
+-- famiglie
+update tab_finale tf
+join (
+	select tot.id_cliente, tot.totale
+	from tot_trans_tipologia tot
+	where tot.tipo_transazione = 'accredito' and tot.tipo_conto like '%Famiglie%'
+) as t on tf.id_cliente = t.id_cliente
+set tf.importo_in_famiglie = round(t.totale,2);
