@@ -1,5 +1,5 @@
 /*
-
+ * 
 Obiettivo
 Il nostro obiettivo è creare una tabella di feature per il training di modelli di machine learning,
 arricchendo i dati dei clienti con vari indicatori calcolati a partire dalle loro transazioni e dai conti posseduti.
