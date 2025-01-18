@@ -1,0 +1,187 @@
+INSERT INTO tab_finale (
+    id_cliente, eta, 
+    num_trans_out_all, num_trans_in_all, 
+    importo_out_all, importo_in_all, 
+    num_conti_tot, num_conti_base, num_conti_business, num_conti_privati, num_conti_famiglie, 
+    num_trans_out_base, num_trans_out_business, num_trans_out_privati, num_trans_out_famiglie, 
+    num_trans_in_base, num_trans_in_business, num_trans_in_privati, num_trans_in_famiglie,
+    importo_out_base, importo_out_business, importo_out_privati, importo_out_famiglie,
+    importo_in_base, importo_in_business, importo_in_privati, importo_in_famiglie
+)
+SELECT 
+    c.id_cliente, c.eta,
+    COALESCE(n_out_all.value, 0) AS num_trans_out_all,
+    COALESCE(n_in_all.value, 0) AS num_trans_in_all,
+    COALESCE(t_out_all.totale, 0) AS importo_out_all,
+    COALESCE(t_in_all.totale, 0) AS importo_in_all,
+    COALESCE(nt.num_accounts, 0) AS num_conti_tot,
+    COALESCE(nt_base.num_accounts, 0) AS num_conti_base,
+    COALESCE(nt_business.num_accounts, 0) AS num_conti_business,
+    COALESCE(nt_privati.num_accounts, 0) AS num_conti_privati,
+    COALESCE(nt_famiglie.num_accounts, 0) AS num_conti_famiglie,
+    COALESCE(nt_out_base.num_transazioni, 0) AS num_trans_out_base,
+    COALESCE(nt_out_business.num_transazioni, 0) AS num_trans_out_business,
+    COALESCE(nt_out_privati.num_transazioni, 0) AS num_trans_out_privati,
+    COALESCE(nt_out_famiglie.num_transazioni, 0) AS num_trans_out_famiglie,
+    COALESCE(nt_in_base.num_transazioni, 0) AS num_trans_in_base,
+    COALESCE(nt_in_business.num_transazioni, 0) AS num_trans_in_business,
+    COALESCE(nt_in_privati.num_transazioni, 0) AS num_trans_in_privati,
+    COALESCE(nt_in_famiglie.num_transazioni, 0) AS num_trans_in_famiglie,
+    ROUND(COALESCE(t_out_base.totale, 0), 2) AS importo_out_base,
+    ROUND(COALESCE(t_out_business.totale, 0), 2) AS importo_out_business,
+    ROUND(COALESCE(t_out_privati.totale, 0), 2) AS importo_out_privati,
+    ROUND(COALESCE(t_out_famiglie.totale, 0), 2) AS importo_out_famiglie,
+    ROUND(COALESCE(t_in_base.totale, 0), 2) AS importo_in_base,
+    ROUND(COALESCE(t_in_business.totale, 0), 2) AS importo_in_business,
+    ROUND(COALESCE(t_in_privati.totale, 0), 2) AS importo_in_privati,
+    ROUND(COALESCE(t_in_famiglie.totale, 0), 2) AS importo_in_famiglie
+FROM 
+    cliente_tmp c
+LEFT JOIN (
+    SELECT id_cliente, SUM(value) AS value
+    FROM num_trans
+    WHERE tipo = 'spesa'
+    GROUP BY id_cliente
+) n_out_all ON c.id_cliente = n_out_all.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(value) AS value
+    FROM num_trans
+    WHERE tipo = 'accredito'
+    GROUP BY id_cliente
+) n_in_all ON c.id_cliente = n_in_all.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans
+    WHERE tipo = 'spesa'
+    GROUP BY id_cliente
+) t_out_all ON c.id_cliente = t_out_all.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans
+    WHERE tipo = 'accredito'
+    GROUP BY id_cliente
+) t_in_all ON c.id_cliente = t_in_all.id_cliente
+LEFT JOIN num_tot_conti nt ON c.id_cliente = nt.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    FROM num_tot_conti_tipologia
+    WHERE tipo LIKE '%Base%'
+    GROUP BY id_cliente
+) nt_base ON c.id_cliente = nt_base.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    FROM num_tot_conti_tipologia
+    WHERE tipo LIKE '%Business%'
+    GROUP BY id_cliente
+) nt_business ON c.id_cliente = nt_business.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    FROM num_tot_conti_tipologia
+    WHERE tipo LIKE '%Privati%'
+    GROUP BY id_cliente
+) nt_privati ON c.id_cliente = nt_privati.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    FROM num_tot_conti_tipologia
+    WHERE tipo LIKE '%Famiglie%'
+    GROUP BY id_cliente
+) nt_famiglie ON c.id_cliente = nt_famiglie.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Base%'
+    GROUP BY id_cliente
+) nt_out_base ON c.id_cliente = nt_out_base.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Business%'
+    GROUP BY id_cliente
+) nt_out_business ON c.id_cliente = nt_out_business.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Privati%'
+    GROUP BY id_cliente
+) nt_out_privati ON c.id_cliente = nt_out_privati.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Famiglie%'
+    GROUP BY id_cliente
+) nt_out_famiglie ON c.id_cliente = nt_out_famiglie.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Base%'
+    GROUP BY id_cliente
+) nt_in_base ON c.id_cliente = nt_in_base.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Business%'
+    GROUP BY id_cliente
+) nt_in_business ON c.id_cliente = nt_in_business.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Privati%'
+    GROUP BY id_cliente
+) nt_in_privati ON c.id_cliente = nt_in_privati.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    FROM num_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Famiglie%'
+    GROUP BY id_cliente
+) nt_in_famiglie ON c.id_cliente = nt_in_famiglie.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Base%'
+    GROUP BY id_cliente
+) t_out_base ON c.id_cliente = t_out_base.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Business%'
+    GROUP BY id_cliente
+) t_out_business ON c.id_cliente = t_out_business.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Privati%'
+    GROUP BY id_cliente
+) t_out_privati ON c.id_cliente = t_out_privati.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Famiglie%'
+    GROUP BY id_cliente
+) t_out_famiglie ON c.id_cliente = t_out_famiglie.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Base%'
+    GROUP BY id_cliente
+) t_in_base ON c.id_cliente = t_in_base.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Business%'
+    GROUP BY id_cliente
+) t_in_business ON c.id_cliente = t_in_business.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Privati%'
+    GROUP BY id_cliente
+) t_in_privati ON c.id_cliente = t_in_privati.id_cliente
+LEFT JOIN (
+    SELECT id_cliente, SUM(totale) AS totale
+    FROM tot_trans_tipologia
+    WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Famiglie%'
+    GROUP BY id_cliente
+) t_in_famiglie ON c.id_cliente = t_in_famiglie.id_cliente;
+
+
+ Generato da ProfAI - https://prof.profession.ai/
