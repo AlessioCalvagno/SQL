@@ -1,3 +1,4 @@
+DROP database IF EXISTS banca;
 create database banca;
 use banca;
 CREATE TABLE cliente (

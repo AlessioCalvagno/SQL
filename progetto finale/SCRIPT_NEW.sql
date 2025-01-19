@@ -44,7 +44,7 @@ use banca;
 /**
  * 
  * 
- * Parte 1 - creazione delle viste di supporto
+ * Parte 1 - creazione delle tabelle di supporto
  * 
  * 
  */
@@ -244,7 +244,7 @@ select * from tot_trans_tipologia limit 50;
  * 
  * Nota importante:
  * Ispezionando le tabelle create nella parte 1, si può vedere come non tutti gli id_cliente siano presenti:
- * ad esempio nella vista 'num_tot_conti' non è presente id_cliente = 0, in quanto tale cliente non ha conti associati e pertanto viene filtrato
+ * ad esempio nella tabella 'num_tot_conti' non è presente id_cliente = 0, in quanto tale cliente non ha conti associati e pertanto viene filtrato
  * dalle (inner) join eseguite nella definizione della tabella. 
  * 
  * Poichè è richiesto di fornire un record per ogni cliente registrato (anche senza conti e transazioni associati), si usa questo workaround: 
@@ -324,153 +324,130 @@ SELECT
 FROM 
     cliente_tmp c
 LEFT JOIN (
-    SELECT id_cliente, SUM(value) AS value
-    FROM num_trans
-    WHERE tipo = 'spesa'
-    GROUP BY id_cliente
+	SELECT n.id_cliente, n.value
+    FROM num_trans n
+    WHERE n.tipo = 'spesa'
 ) n_out_all ON c.id_cliente = n_out_all.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(value) AS value
-    FROM num_trans
-    WHERE tipo = 'accredito'
-    GROUP BY id_cliente
+    SELECT n.id_cliente, n.value
+    FROM num_trans n
+    WHERE n.tipo = 'accredito'
 ) n_in_all ON c.id_cliente = n_in_all.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
-    FROM tot_trans
-    WHERE tipo = 'spesa'
-    GROUP BY id_cliente
+ 	SELECT tot.id_cliente, tot.totale
+    FROM tot_trans tot
+    WHERE tot.tipo = 'spesa'
 ) t_out_all ON c.id_cliente = t_out_all.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
-    FROM tot_trans
-    WHERE tipo = 'accredito'
-    GROUP BY id_cliente
+    SELECT tot.id_cliente, tot.totale
+    FROM tot_trans tot
+    WHERE tot.tipo = 'accredito'
 ) t_in_all ON c.id_cliente = t_in_all.id_cliente
 LEFT JOIN num_tot_conti nt ON c.id_cliente = nt.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    SELECT id_cliente, num_accounts
     FROM num_tot_conti_tipologia
     WHERE tipo LIKE '%Base%'
-    GROUP BY id_cliente
 ) nt_base ON c.id_cliente = nt_base.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    SELECT id_cliente, num_accounts
     FROM num_tot_conti_tipologia
     WHERE tipo LIKE '%Business%'
-    GROUP BY id_cliente
 ) nt_business ON c.id_cliente = nt_business.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    SELECT id_cliente, num_accounts
     FROM num_tot_conti_tipologia
     WHERE tipo LIKE '%Privati%'
-    GROUP BY id_cliente
 ) nt_privati ON c.id_cliente = nt_privati.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_accounts) AS num_accounts
+    SELECT id_cliente, num_accounts
     FROM num_tot_conti_tipologia
     WHERE tipo LIKE '%Famiglie%'
-    GROUP BY id_cliente
 ) nt_famiglie ON c.id_cliente = nt_famiglie.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Base%'
-    GROUP BY id_cliente
 ) nt_out_base ON c.id_cliente = nt_out_base.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Business%'
-    GROUP BY id_cliente
 ) nt_out_business ON c.id_cliente = nt_out_business.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Privati%'
-    GROUP BY id_cliente
 ) nt_out_privati ON c.id_cliente = nt_out_privati.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Famiglie%'
-    GROUP BY id_cliente
 ) nt_out_famiglie ON c.id_cliente = nt_out_famiglie.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Base%'
-    GROUP BY id_cliente
 ) nt_in_base ON c.id_cliente = nt_in_base.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Business%'
-    GROUP BY id_cliente
 ) nt_in_business ON c.id_cliente = nt_in_business.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Privati%'
-    GROUP BY id_cliente
 ) nt_in_privati ON c.id_cliente = nt_in_privati.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(num_transazioni) AS num_transazioni
+    SELECT id_cliente, num_transazioni
     FROM num_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Famiglie%'
-    GROUP BY id_cliente
 ) nt_in_famiglie ON c.id_cliente = nt_in_famiglie.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Base%'
-    GROUP BY id_cliente
 ) t_out_base ON c.id_cliente = t_out_base.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Business%'
-    GROUP BY id_cliente
 ) t_out_business ON c.id_cliente = t_out_business.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Privati%'
-    GROUP BY id_cliente
 ) t_out_privati ON c.id_cliente = t_out_privati.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'spesa' AND tipo_conto LIKE '%Famiglie%'
-    GROUP BY id_cliente
 ) t_out_famiglie ON c.id_cliente = t_out_famiglie.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Base%'
-    GROUP BY id_cliente
 ) t_in_base ON c.id_cliente = t_in_base.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Business%'
-    GROUP BY id_cliente
 ) t_in_business ON c.id_cliente = t_in_business.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Privati%'
-    GROUP BY id_cliente
 ) t_in_privati ON c.id_cliente = t_in_privati.id_cliente
 LEFT JOIN (
-    SELECT id_cliente, SUM(totale) AS totale
+    SELECT id_cliente, totale
     FROM tot_trans_tipologia
     WHERE tipo_transazione = 'accredito' AND tipo_conto LIKE '%Famiglie%'
-    GROUP BY id_cliente
 ) t_in_famiglie ON c.id_cliente = t_in_famiglie.id_cliente;
 
 
 -- eliminazione delle tabelle non più necessarie
+
 
 drop table if exists cliente_tmp;
 drop table if exists num_trans;
@@ -479,4 +456,5 @@ drop table if exists num_tot_conti;
 drop table if exists num_tot_conti_tipologia;
 drop table if exists num_trans_tipologia;
 drop table if exists tot_trans_tipologia;
+
 
